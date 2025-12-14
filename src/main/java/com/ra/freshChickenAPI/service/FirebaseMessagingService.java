@@ -19,55 +19,105 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 
 @Service
 public class FirebaseMessagingService {
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseMessagingService.class);
 
-    private final FirebaseMessaging firebaseMessaging;
+    private FirebaseMessaging firebaseMessaging;
+    private boolean firebaseInitialized = false;
 
     @Autowired
     private FCMTokenRepository fcmTokenRepository;
 
     public FirebaseMessagingService() {
-        this.firebaseMessaging = FirebaseMessaging.getInstance();
-        logger.info("✅ Firebase Messaging Service initialized");
+        // Don't initialize Firebase here - it will be lazy loaded when needed
+        logger.info("✅ Firebase Messaging Service created (lazy initialization)");
+    }
+
+    /**
+     * Lazy initialization of Firebase Messaging
+     */
+    private synchronized FirebaseMessaging getFirebaseMessaging() {
+        if (!firebaseInitialized) {
+            try {
+                this.firebaseMessaging = FirebaseMessaging.getInstance();
+                this.firebaseInitialized = true;
+                logger.info("✅ Firebase Messaging Service initialized successfully");
+            } catch (IllegalStateException e) {
+                logger.error("❌ Firebase not initialized. Firebase features will be disabled. Error: {}", e.getMessage());
+                logger.warn("⚠️ Application will continue without Firebase push notifications");
+                this.firebaseInitialized = true; // Mark as "handled" to prevent repeated attempts
+                return null; // Return null to indicate Firebase is not available
+            } catch (Exception e) {
+                logger.error("❌ Failed to initialize Firebase Messaging: {}", e.getMessage());
+                logger.warn("⚠️ Application will continue without Firebase push notifications");
+                this.firebaseInitialized = true; // Mark as "handled" to prevent repeated attempts
+                return null; // Return null to indicate Firebase is not available
+            }
+        }
+        
+        return firebaseMessaging;
+    }
+    
+    /**
+     * Check if Firebase is available
+     */
+    public boolean isFirebaseAvailable() {
+        return getFirebaseMessaging() != null;
+    }
+    
+    /**
+     * Send notification only if Firebase is available
+     */
+    private void sendNotificationIfAvailable(Runnable notificationAction, String notificationType) {
+        if (isFirebaseAvailable()) {
+            try {
+                notificationAction.run();
+            } catch (Exception e) {
+                logger.error("❌ Failed to send {} notification: {}", notificationType, e.getMessage());
+            }
+        } else {
+            logger.debug("⚠️ Skipping {} notification - Firebase not available", notificationType);
+        }
     }
 
     /**
      * Send FCM notification to a single device
      */
     public void sendNotificationToToken(String token, String title, String body, String type, String data) {
-        try {
-            Notification notification = Notification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .build();
+        sendNotificationIfAvailable(() -> {
+            try {
+                Notification notification = Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .build();
 
-            Message message = Message.builder()
-                    .setToken(token)
-                    .setNotification(notification)
-                    .putData("type", type)
-                    .putData("message", data)
-                    .setAndroidConfig(AndroidConfig.builder()
-                            .setPriority(AndroidConfig.Priority.HIGH)
-                            .setNotification(AndroidNotification.builder()
-                                    .setSound("default")
-                                    .setChannelId("order_notifications")
-                                    .build())
-                            .build())
-                    .build();
+                Message message = Message.builder()
+                        .setToken(token)
+                        .setNotification(notification)
+                        .putData("type", type)
+                        .putData("message", data)
+                        .setAndroidConfig(AndroidConfig.builder()
+                                .setPriority(AndroidConfig.Priority.HIGH)
+                                .setNotification(AndroidNotification.builder()
+                                        .setSound("default")
+                                        .setChannelId("order_notifications")
+                                        .build())
+                                .build())
+                        .build();
 
-            String response = firebaseMessaging.send(message);
-            logger.info("✅ Successfully sent FCM message: {}", response);
-        } catch (FirebaseMessagingException e) {
-            logger.error("❌ Failed to send FCM message to token {}: {}", token, e.getMessage());
-            // Log error code if available
-            if (e.getMessagingErrorCode() != null) {
-                logger.error("Error code: {}", e.getMessagingErrorCode());
+                String response = getFirebaseMessaging().send(message);
+                logger.info("✅ Successfully sent FCM message: {}", response);
+            } catch (FirebaseMessagingException e) {
+                logger.error("❌ Failed to send FCM message to token {}: {}", token, e.getMessage());
+                if (e.getMessagingErrorCode() != null) {
+                    logger.error("Error code: {}", e.getMessagingErrorCode());
+                }
             }
-        }
+        }, "single token");
     }
 
     /**
@@ -79,63 +129,65 @@ public class FirebaseMessagingService {
             return;
         }
 
-        try {
-            Notification notification = Notification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .build();
+        sendNotificationIfAvailable(() -> {
+            try {
+                Notification notification = Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .build();
 
-            // Create multicast message
-            MulticastMessage message = MulticastMessage.builder()
-                    .setNotification(notification)
-                    .putData("type", type)
-                    .putData("message", data)
-                    .addAllTokens(tokens)
-                    .setAndroidConfig(AndroidConfig.builder()
-                            .setPriority(AndroidConfig.Priority.HIGH)
-                            .setNotification(AndroidNotification.builder()
-                                    .setSound("default")
-                                    .setChannelId("order_notifications")
-                                    .build())
-                            .build())
-                    .build();
+                // Create multicast message
+                MulticastMessage message = MulticastMessage.builder()
+                        .setNotification(notification)
+                        .putData("type", type)
+                        .putData("message", data)
+                        .addAllTokens(tokens)
+                        .setAndroidConfig(AndroidConfig.builder()
+                                .setPriority(AndroidConfig.Priority.HIGH)
+                                .setNotification(AndroidNotification.builder()
+                                        .setSound("default")
+                                        .setChannelId("order_notifications")
+                                        .build())
+                                .build())
+                        .build();
 
-            // ✅ FIXED: Use sendEachForMulticast instead of sendMulticast
-            BatchResponse response = firebaseMessaging.sendEachForMulticast(message);
-            
-            logger.info("✅ Successfully sent FCM multicast message. Success count: {}, Failure count: {}",
-                       response.getSuccessCount(), response.getFailureCount());
+                // ✅ FIXED: Use sendEachForMulticast instead of sendMulticast
+                BatchResponse response = getFirebaseMessaging().sendEachForMulticast(message);
+                
+                logger.info("✅ Successfully sent FCM multicast message. Success count: {}, Failure count: {}",
+                           response.getSuccessCount(), response.getFailureCount());
 
-            // Log failures with details and handle invalid tokens
-            if (response.getFailureCount() > 0) {
-                List<SendResponse> responses = response.getResponses();
-                for (int i = 0; i < responses.size(); i++) {
-                    if (!responses.get(i).isSuccessful()) {
-                        String failedToken = tokens.get(i);
-                        FirebaseMessagingException exception = responses.get(i).getException();
-                        
-                        logger.error("❌ FCM send failed for token {}: {}", 
-                                failedToken, exception.getMessage());
-                        
-                        // Handle specific FCM errors
-                        if (isInvalidTokenError(exception)) {
-                            logger.warn("🗑️ Removing invalid token: {}", failedToken);
-                            removeInvalidToken(failedToken);
-                        } else if (isQuotaExceededError(exception)) {
-                            logger.warn("⚠️ Quota exceeded for token: {}", failedToken);
-                            // Could implement retry logic here
-                        } else {
-                            logger.error("Error code: {}", exception.getMessagingErrorCode());
+                // Log failures with details and handle invalid tokens
+                if (response.getFailureCount() > 0) {
+                    List<SendResponse> responses = response.getResponses();
+                    for (int i = 0; i < responses.size(); i++) {
+                        if (!responses.get(i).isSuccessful()) {
+                            String failedToken = tokens.get(i);
+                            FirebaseMessagingException exception = responses.get(i).getException();
+                            
+                            logger.error("❌ FCM send failed for token {}: {}",
+                                    failedToken, exception.getMessage());
+                            
+                            // Handle specific FCM errors
+                            if (isInvalidTokenError(exception)) {
+                                logger.warn("🗑️ Removing invalid token: {}", failedToken);
+                                removeInvalidToken(failedToken);
+                            } else if (isQuotaExceededError(exception)) {
+                                logger.warn("⚠️ Quota exceeded for token: {}", failedToken);
+                                // Could implement retry logic here
+                            } else {
+                                logger.error("Error code: {}", exception.getMessagingErrorCode());
+                            }
                         }
                     }
                 }
+            } catch (FirebaseMessagingException e) {
+                logger.error("❌ Failed to send FCM multicast message: {}", e.getMessage());
+                if (e.getMessagingErrorCode() != null) {
+                    logger.error("Error code: {}", e.getMessagingErrorCode());
+                }
             }
-        } catch (FirebaseMessagingException e) {
-            logger.error("❌ Failed to send FCM multicast message: {}", e.getMessage());
-            if (e.getMessagingErrorCode() != null) {
-                logger.error("Error code: {}", e.getMessagingErrorCode());
-            }
-        }
+        }, "multicast");
     }
 
     /**
