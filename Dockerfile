@@ -1,5 +1,5 @@
-# Use OpenJDK 17 with Alpine for smaller image size
-FROM openjdk:17-jdk-alpine
+# Use Eclipse Temurin (AdoptOpenJDK) which is more reliable
+FROM eclipse-temurin:17-jdk-alpine
 
 # Install Maven
 RUN apk add --no-cache maven
