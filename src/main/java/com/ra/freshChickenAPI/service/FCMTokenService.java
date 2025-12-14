@@ -85,6 +85,16 @@ public class FCMTokenService {
                 .map(FCMToken::getToken)
                 .collect(Collectors.toList());
     }
+    
+    /**
+     * Get all active FCM tokens for all admins (for broadcasting)
+     */
+    public List<String> getAllActiveAdminTokens() {
+        return fcmTokenRepository.findAllActiveAdminTokens()
+                .stream()
+                .map(FCMToken::getToken)
+                .collect(Collectors.toList());
+    }
 
     /**
      * Deactivate a token

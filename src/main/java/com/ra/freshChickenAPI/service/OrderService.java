@@ -164,7 +164,7 @@ public class OrderService {
 
         // Send FCM notifications to all admins
         try {
-            List<String> adminTokens = fcmTokenService.getAllActiveTokens();
+            List<String> adminTokens = fcmTokenService.getAllActiveAdminTokens();
             if (!adminTokens.isEmpty()) {
                 firebaseMessagingService.sendOrderCreatedNotification(
                         adminTokens,
@@ -258,27 +258,23 @@ public class OrderService {
         logger.info("✅ [ORDER-STATUS-UPDATE] Persistent notification created");
 
         // Send FCM notifications to all admins
-        logger.info("📤 [ORDER-STATUS-UPDATE] Sending FCM notifications to admins...");
-        try {
-            List<String> adminTokens = fcmTokenService.getAllActiveTokens();
-            logger.info("📱 [ORDER-STATUS-UPDATE] Found {} active admin tokens", adminTokens.size());
-            
-            if (!adminTokens.isEmpty()) {
-                firebaseMessagingService.sendOrderStatusUpdatedNotification(
-                        adminTokens,
-                        updatedOrder.getId(),
-                        updatedOrder.getCustomer().getName(),
-                        previousStatus,
-                        status.toString()
-                );
-                logger.info("✅ [ORDER-STATUS-UPDATE] Admin FCM notification sent successfully");
-            } else {
-                logger.warn("⚠️ [ORDER-STATUS-UPDATE] No active admin tokens found");
-            }
-        } catch (Exception e) {
-            logger.error("❌ [ORDER-STATUS-UPDATE] Failed to send admin FCM notification: {}", e.getMessage());
-            // Don't fail the status update if FCM fails
-        }
+		/*
+		 * logger.info("📤 [ORDER-STATUS-UPDATE] Sending FCM notifications to admins..."
+		 * ); try { List<String> adminTokens =
+		 * fcmTokenService.getAllActiveAdminTokens();
+		 * logger.info("📱 [ORDER-STATUS-UPDATE] Found {} active admin tokens",
+		 * adminTokens.size());
+		 * 
+		 * if (!adminTokens.isEmpty()) {
+		 * firebaseMessagingService.sendOrderStatusUpdatedNotification( adminTokens,
+		 * updatedOrder.getId(), updatedOrder.getCustomer().getName(), previousStatus,
+		 * status.toString() ); logger.
+		 * info("✅ [ORDER-STATUS-UPDATE] Admin FCM notification sent successfully"); }
+		 * else { logger.warn("⚠️ [ORDER-STATUS-UPDATE] No active admin tokens found");
+		 * } } catch (Exception e) { logger.
+		 * error("❌ [ORDER-STATUS-UPDATE] Failed to send admin FCM notification: {}",
+		 * e.getMessage()); // Don't fail the status update if FCM fails }
+		 */
 
         // Send customer notification if status actually changed
         if (!previousStatus.equals(status.toString())) {

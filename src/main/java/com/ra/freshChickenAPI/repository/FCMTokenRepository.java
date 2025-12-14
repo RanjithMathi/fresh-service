@@ -50,4 +50,8 @@ public interface FCMTokenRepository extends JpaRepository<FCMToken, Long> {
     // Find stale tokens (active tokens not used for a while)
     @Query("SELECT t FROM FCMToken t WHERE t.isActive = true AND (t.lastUsedAt IS NULL OR t.lastUsedAt < :cutoffDate)")
     List<FCMToken> findStaleTokens(@Param("cutoffDate") java.time.LocalDateTime cutoffDate);
+    
+    @Query("SELECT t FROM FCMToken t WHERE t.isActive = true AND t.admin IS NOT NULL")
+    List<FCMToken> findAllActiveAdminTokens();
+    
 }
