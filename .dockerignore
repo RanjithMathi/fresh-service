@@ -1,0 +1,58 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+env.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+docs/
+
+# Test files
+src/test/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Uploads (if they contain user data)
+uploads/
+
+# Build artifacts (will be recreated during Docker build)
+*.jar
+*.war
+
+# BFG reports
+.bfg-report/
+..bfg-report/
+
+# Error logs
+hs_err_pid*.log

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: fresh-chicken-api
+    env: docker
+    region: oregon # Change to your preferred region
+    plan: free # Change to your preferred plan
+    buildCommand: docker build -t fresh-chicken-api .
+    healthCheckPath: /api/actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: JAVA_OPTS
+        value: -Xmx512m -Xms256m
+    # Uncomment and configure these when you have your database and external services ready
+    # - key: DB_URL
+    #   value: your_mysql_database_url
+    # - key: DB_USERNAME  
+    #   value: your_database_username
+    # - key: DB_PASSWORD
+    #   value: your_database_password
+    # - key: TWILIO_ACCOUNT_SID
+    #   value: your_twilio_account_sid
+    # - key: TWILIO_AUTH_TOKEN
+    #   value: your_twilio_auth_token
+    # - key: TWILIO_PHONE_NUMBER
+    #   value: your_twilio_phone_number
+    # - key: FIREBASE_SERVICE_ACCOUNT
+    #   value: your_firebase_service_account_json
